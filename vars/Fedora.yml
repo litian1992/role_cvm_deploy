@@ -2,6 +2,4 @@
 ---
 # Put internal variables here with Fedora specific values.
 
-# Example:
-__cvm_deploy_packages: []
 __cvm_deploy_services: []

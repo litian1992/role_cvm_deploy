@@ -6,7 +6,12 @@
 
 # Examples of non-distribution specific (generic) internal variables:
 __cvm_deploy_foo_config: foo.conf
-__cvm_deploy_packages: []
+__cvm_deploy_trustee_gc_packages:
+  - podman
+  - git
+__cvm_deploy_encrypt_disk_packages:
+  - cryptsetup
+  - parted
 __cvm_deploy_services: []
 # ansible_facts required by the role
 __cvm_deploy_required_facts:

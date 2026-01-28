@@ -1,0 +1,160 @@
+---
+- name: Ensure required packages are installed
+  ansible.builtin.package:
+    name: "{{ __cvm_deploy_trustee_gc_packages }}"
+    state: present
+    use: "{{ (__cvm_deploy_is_ostree | d(false)) |
+          ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
+
+- name: Disable SELinux
+  block:
+    - name: Get current SELinux mode
+      ansible.builtin.command: getenforce
+      register: __selinux_mode
+      changed_when: false
+      failed_when: false
+
+    - name: Set SELinux to permissive mode
+      ansible.builtin.command: setenforce 0
+      when:
+        - __selinux_mode is succeeded
+        - __selinux_mode.stdout is defined
+        - __selinux_mode.stdout not in ['Permissive', 'disabled']
+      changed_when: true
+      failed_when: false
+
+    - name: Stat SELinux config file
+      ansible.builtin.stat:
+        path: /etc/selinux/config
+      register: __selinux_config
+
+    - name: Disable SELinux permanently
+      ansible.builtin.replace:
+        path: /etc/selinux/config
+        regexp: '^SELINUX=.*'
+        replace: 'SELINUX=disabled'
+      when: __selinux_config.stat.exists
+
+- name: Ensure quadlet install directory exists
+  ansible.builtin.file:
+    path: "{{ cvm_deploy_quadlet_install_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Create a temporary directory for the quadlet repository
+  ansible.builtin.tempfile:
+    state: directory
+  register: __cvm_deploy_quadlet_repo_dir
+
+- name: Download Trustee Guest Components quadlet files from GitHub repository
+  ansible.builtin.git:
+    repo: "{{ cvm_deploy_quadlet_repo_url }}"
+    dest: "{{ __cvm_deploy_quadlet_repo_dir.path }}"
+    version: "{{ cvm_deploy_quadlet_repo_branch }}"
+    depth: 1
+    force: true
+  register: quadlet_repo_download
+
+- name: Find Trustee Guest Components quadlet files in repository
+  ansible.builtin.find:
+    paths: "{{ __cvm_deploy_quadlet_repo_dir.path }}/{{ cvm_deploy_quadlet_repo_path }}"
+    patterns:
+      - "*.container"
+      - "*.volume"
+      - "*.network"
+      - "*.kube"
+      - "*.pod"
+    recurse: false
+  register: quadlet_files_found
+
+- name: Fail if no Trustee Guest Components quadlet files found
+  ansible.builtin.fail:
+    msg: "No quadlet files found in {{ cvm_deploy_quadlet_repo_url }}/{{ cvm_deploy_quadlet_repo_path }}"
+  when: quadlet_files_found.files | length == 0
+
+- name: Copy Trustee Guest Components quadlet files to install directory
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: "{{ cvm_deploy_quadlet_install_dir }}/{{ item.path | basename }}"
+    mode: "0644"
+    remote_src: true
+    force: true
+  loop: "{{ quadlet_files_found.files }}"
+  register: quadlet_files_copied
+
+- name: Stat repository configs directory
+  ansible.builtin.stat:
+    path: "{{ __cvm_deploy_quadlet_repo_dir.path }}/configs"
+  register: __repo_configs_dir
+
+- name: Copy Trustee Guest Components config files to /etc/trustee-gc/
+  ansible.builtin.copy:
+    src: "{{ __cvm_deploy_quadlet_repo_dir.path }}/configs/"
+    dest: /etc/trustee-gc/
+    mode: "0644"
+    remote_src: true
+    force: true
+  when: __repo_configs_dir.stat.exists
+
+- name: Replace KBS_URL and KBS_CERT in config.toml files
+  ansible.builtin.replace:
+    path: "{{ item.path }}"
+    regexp: "{{ item.regexp }}"
+    replace: "{{ item.replace }}"
+  loop:
+    - path: /etc/trustee-gc/cdh/config.toml
+      regexp: KBS_URL
+      replace: "{{ cvm_deploy_trustee_kbs_url }}"
+    - path: /etc/trustee-gc/cdh/config.toml
+      regexp: KBS_CERT
+      replace: "{{ cvm_deploy_trustee_kbs_cert }}"
+    - path: /etc/trustee-gc/aa/config.toml
+      regexp: KBS_URL
+      replace: "{{ cvm_deploy_trustee_kbs_url }}"
+    - path: /etc/trustee-gc/aa/config.toml
+      regexp: KBS_CERT
+      replace: "{{ cvm_deploy_trustee_kbs_cert }}"
+  when:
+    - __repo_configs_dir.stat.exists
+    - cvm_deploy_trustee_kbs_url != "" or cvm_deploy_trustee_kbs_cert != ""
+
+- name: Create podman storage directory on encrypted disk
+  ansible.builtin.file:
+    path: "{{ cvm_deploy_encrypt_disk_mount_point }}/containers-storage"
+    state: directory
+    mode: '0755'
+  when: cvm_deploy_encrypt_disk | bool
+
+- name: Configure podman to use encrypted disk for storage
+  ansible.builtin.copy:
+    content: |
+      [storage]
+      driver = "overlay"
+      graphroot = "{{ cvm_deploy_encrypt_disk_mount_point }}/containers-storage"
+    dest: /etc/containers/storage.conf
+    mode: '0644'
+  when: cvm_deploy_encrypt_disk | bool
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Get the installed Trustee Guest Components pod name
+  ansible.builtin.find:
+    paths: "{{ cvm_deploy_quadlet_install_dir }}"
+    patterns: "*.pod"
+  register: trustee_gc_pod_name
+
+- name: Enable and start Trustee Guest Components services
+  ansible.builtin.systemd:
+    name: "{{ trustee_gc_pod_name.files[0].path | basename | regex_replace('\\.pod$', '') }}-pod.service"
+    enabled: true
+    state: restarted
+    daemon_reload: true
+  when: trustee_gc_pod_name.files | length > 0
+  failed_when: false
+
+- name: Clean up temporary repository directory
+  ansible.builtin.file:
+    path: "{{ __cvm_deploy_quadlet_repo_dir.path }}"
+    state: absent

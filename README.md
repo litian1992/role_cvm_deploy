@@ -4,73 +4,52 @@
 
 ![cvm_deploy](https://github.com/linux-system-roles/cvm_deploy/workflows/tox/badge.svg)
 
-Ansible role for managing confidential computing machine deployments.
+Ansible role for deploying Trustee Guest Components using Podman Quadlets for
+confidential virtual machine deployments. The role downloads quadlet files and
+configuration files from a GitHub repository, installs them, and manages them as
+systemd services. The role also supports optional disk encryption functionality for
+securing additional storage devices.
 
-## Requirements
+The role will:
 
-Any prerequisites that may not be covered by Ansible itself or the role should
-be mentioned here.  This includes platform dependencies not managed by the
-role, hardware requirements, external collections, etc.  There should be a
-distinction between *control node* requirements (like collections) and
-*managed node* requirements (like special hardware, platform provisioning).
-
-### Collection requirements
-
-For instance, if the role depends on some collections and has a
-`meta/collection-requirements.yml` file for installing those dependencies, and
-in order to manage `rpm-ostree` systems, it should be mentioned here that the
- user should run
-
-```bash
-ansible-galaxy collection install -vv -r meta/collection-requirements.yml
-```
-
-on the *control node* before using the role.
-
-## Role Variables
-
-A description of all input variables (i.e. variables that are defined in
-`defaults/main.yml`) for the role should go here as these form an API of the
-role.  Each variable should have its own section e.g.
-
-### cvm_deploy_config1
-
-This variable is required.  It is a string that lists the foo of the role.
-There is no default value.
-
-### cvm_deploy_config2
-
-This variable is optional.  It is a boolean that tells the role to disable bar.
-The default value is `true`.
-
-Variables that are not intended as input, like variables defined in
-`vars/main.yml`, variables that are read from other roles and/or the global
-scope (ie. hostvars, group vars, etc.) can be also mentioned here but keep in
-mind that as these are probably not part of the role API they may change during
-the lifetime.
+1. Install Podman and Git if not already present
+2. Download Trustee Guest Components quadlet files and config files from the
+   specified GitHub repository
+3. Copy quadlet files (`.container`, `.volume`, `.network`, `.kube`) to the
+   install directory (`/etc/containers/systemd` by default)
+4. Copy config files from the repository's `configs` directory to `/etc/trustee-gc/`
+5. Replace `KBS_URL` and `KBS_CERT` placeholders in `/etc/trustee-gc/cdh/config.toml`
+   with the values from `cvm_deploy_trustee_kbs_url` and `cvm_deploy_trustee_kbs_cert`
+   variables (if provided)
+6. Reload systemd daemon
+7. Enable and start the Trustee Guest Components services
+8. (Optional) If `cvm_deploy_encrypt_disk` is `true`:
+   - Find an unpartitioned and unmounted disk
+   - Create a GPT partition table and partition on the disk
+   - Generate an encryption key and encrypt the partition using LUKS
+   - Format the encrypted partition with ext4
+   - Mount the encrypted disk at the specified mount point
+   - Store the encryption key in the `encrypted_disk_key` fact
 
 Example of setting the variables:
 
 ```yaml
-cvm_deploy_config1: "oof"
-cvm_deploy_config2: false
+cvm_deploy_quadlet_repo_url: "https://github.com/litian1992/trustee-gc-quadlet-rhel"
+cvm_deploy_quadlet_repo_path: "quadlet"
+cvm_deploy_quadlet_repo_branch: "main"
+cvm_deploy_trustee_kbs_url: "https://kbs.example.com"
+cvm_deploy_trustee_kbs_cert: "/path/to/cert.pem"
+cvm_deploy_encrypt_disk: true
 ```
 
 ## Variables Exported by the Role
 
-This section is optional.  Some roles may export variables for playbooks to
-use later.  These are analogous to "return values" in Ansible modules.  For
-example, if a role performs some action that will require a system reboot, but
-the user wants to defer the reboot, the role might set a variable like
-`template_reboot_needed: true` that the playbook can use to reboot at a more
-convenient time.
+### encrypted_disk_key
 
-Example:
-
-### cvm_deploy_reboot_needed
-
-Default `false` - if `true`, this means a reboot is needed to apply the changes
-made by the role
+If disk encryption is enabled (`cvm_deploy_encrypt_disk: true`), this fact
+contains the base64-encoded encryption key for the encrypted disk. This key is
+required to mount the encrypted disk after a reboot. The key is automatically
+generated during disk encryption and should be securely stored for future use.
 
 ## Example Playbook
 
@@ -78,21 +57,18 @@ Including an example of how to use your role (for instance, with variables
 passed in as parameters) is always nice for users too:
 
 ```yaml
-- name: Manage cvm
+- name: Deploy Trustee Guest Components using Podman Quadlets
   hosts: all
   vars:
-    cvm_deploy_config1: "foo foo!"
-    cvm_deploy_config2: false
+    cvm_deploy_quadlet_repo_url: "https://github.com/litian1992/trustee-gc-quadlet-rhel"
+    cvm_deploy_quadlet_repo_path: "quadlet"
+    cvm_deploy_quadlet_repo_branch: "main"
+    cvm_deploy_trustee_kbs_url: "https://kbs.example.com"
+    cvm_deploy_trustee_kbs_cert: "/path/to/kbs-cert.pem"
+    cvm_deploy_encrypt_disk: true
   roles:
     - linux-system-roles.cvm_deploy
 ```
-
-More examples can be provided in the [`examples/`](examples) directory. These
-can be useful, especially for documentation.
-
-## rpm-ostree
-
-See README-ostree.md
 
 ## License
 

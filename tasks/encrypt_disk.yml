@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: MIT
+---
+- name: Find the first unpartitioned disk
+  ansible.builtin.shell: |
+    set -o pipefail
+    lsblk -n -o NAME,TYPE,PKNAME | awk '
+      $2=="disk" && $1 !~ /^zram|^loop|^dm/ { disk=$1; haspart[disk]=0 }
+      $2=="part" { parent=$3; if (parent in haspart) haspart[parent]=1 }
+      END {
+        for (d in haspart) {
+          if (haspart[d] == 0) {
+            print d
+            exit 0
+          }
+        }
+      }
+    '
+  register: unpartitioned_disk
+  changed_when: false
+  failed_when: false
+
+- name: Encrypt disk
+  when: unpartitioned_disk.stdout != ""
+  block:
+    - name: Ensure packages for disk encryption are installed
+      ansible.builtin.package:
+        name: "{{ __cvm_deploy_encrypt_disk_packages }}"
+        state: present
+        use: "{{ (__cvm_deploy_is_ostree | d(false)) |
+              ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
+
+    - name: Set fact with disk device path
+      ansible.builtin.set_fact:
+        disk_device: "/dev/{{ unpartitioned_disk.stdout }}"
+
+    - name: Create partition table and partition on disk
+      ansible.builtin.shell: |
+        parted -s {{ disk_device }} mklabel gpt
+        parted -s {{ disk_device }} mkpart primary ext4 0% 100%
+      changed_when: true
+
+    - name: Generate a temp file for the key
+      ansible.builtin.tempfile:
+        state: file
+      register: __cvm_deploy_tmp_key
+
+    - name: Generate a key and encrypt the partition
+      ansible.builtin.shell: |
+        set -o pipefail
+        head -c 32 /dev/urandom | base64 > {{ __cvm_deploy_tmp_key.path }}
+        cryptsetup luksFormat --key-file {{ __cvm_deploy_tmp_key.path }} --batch-mode {{ disk_device }}1
+        cryptsetup open --key-file {{ __cvm_deploy_tmp_key.path }} {{ disk_device }}1 encrypted-disk
+        mkfs.ext4 /dev/mapper/encrypted-disk
+        [ -d {{ cvm_deploy_encrypt_disk_mount_point }} ] || mkdir -p {{ cvm_deploy_encrypt_disk_mount_point }}
+        mount /dev/mapper/encrypted-disk {{ cvm_deploy_encrypt_disk_mount_point }}
+      changed_when: true
+      no_log: true
+
+    - name: Read key from remote host
+      ansible.builtin.slurp:
+        src: "{{ __cvm_deploy_tmp_key.path }}"
+      register: slurped_key
+      no_log: true
+
+    - name: Set encrypted disk key fact
+      ansible.builtin.set_fact:
+        encrypted_disk_key: "{{ slurped_key.content }}"
+      no_log: true
+
+    - name: Clean up temporary key file
+      ansible.builtin.file:
+        path: "{{ __cvm_deploy_tmp_key.path }}"
+        state: absent
+# TODO: Add a systemd service to mount the encrypted disk at boot

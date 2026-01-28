@@ -2,12 +2,85 @@
 ---
 - name: Ensure that the role runs with default parameters
   hosts: all
-  gather_facts: false  # test that role works in this case
+  gather_facts: false  # test that role works without pre-gathered facts
+  vars:
+    cvm_deploy_trustee_gc: true
+    cvm_deploy_encrypt_disk: false
   roles:
     - linux-system-roles.cvm_deploy
   tasks:
-    - name: Check header for ansible_managed, fingerprint
-      include_tasks: tasks/check_header.yml
-      vars:
-        __file: /etc/cvm_deploy.conf
-        __fingerprint: system_role:cvm_deploy
+    - name: Collect package facts
+      package_facts:
+        manager: auto
+
+    - name: Assert required packages are installed
+      assert:
+        that:
+          - item in ansible_facts.packages
+        fail_msg: "Required package '{{ item }}' is not installed"
+      loop: "{{ __cvm_deploy_trustee_gc_packages }}"
+
+    - name: Stat the quadlet install directory
+      stat:
+        path: "{{ cvm_deploy_quadlet_install_dir }}"
+      register: __test_quadlet_dir
+
+    - name: Assert quadlet install directory exists
+      assert:
+        that:
+          - __test_quadlet_dir.stat.exists
+          - __test_quadlet_dir.stat.isdir
+        fail_msg: >-
+          Quadlet install directory {{ cvm_deploy_quadlet_install_dir }}
+          does not exist
+
+    - name: Find deployed quadlet files
+      find:
+        paths: "{{ cvm_deploy_quadlet_install_dir }}"
+        patterns:
+          - "*.container"
+          - "*.volume"
+          - "*.network"
+          - "*.kube"
+          - "*.pod"
+      register: __test_quadlet_files
+
+    - name: Assert quadlet files were deployed
+      assert:
+        that:
+          - __test_quadlet_files.files | length > 0
+        fail_msg: >-
+          No quadlet files found in {{ cvm_deploy_quadlet_install_dir }}
+
+    - name: Stat the trustee-gc config directory
+      stat:
+        path: /etc/trustee-gc
+      register: __test_trustee_gc_dir
+
+    - name: Assert trustee-gc config directory exists
+      assert:
+        that:
+          - __test_trustee_gc_dir.stat.exists
+          - __test_trustee_gc_dir.stat.isdir
+        fail_msg: "Trustee GC config directory /etc/trustee-gc does not exist"
+
+    - name: Stat SELinux config file
+      stat:
+        path: /etc/selinux/config
+      register: __test_selinux_config
+
+    - name: Verify SELinux is disabled
+      when: __test_selinux_config.stat.exists
+      block:
+        - name: Read SELinux config file
+          slurp:
+            src: /etc/selinux/config
+          register: __test_selinux_content
+
+        - name: Assert SELinux is set to disabled
+          assert:
+            that:
+              - >-
+                'SELINUX=disabled' in
+                (__test_selinux_content.content | b64decode)
+            fail_msg: "SELinux is not disabled in /etc/selinux/config"
