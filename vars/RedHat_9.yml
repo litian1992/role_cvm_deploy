@@ -6,4 +6,5 @@
 __cvm_deploy_packages:
   - podman
   - git
+  - cryptsetup
 __cvm_deploy_services: []

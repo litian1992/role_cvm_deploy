@@ -7,7 +7,8 @@
 Ansible role for deploying Trustee Guest Components using Podman Quadlets for
 confidential virtual machine deployments. The role downloads quadlet files and
 configuration files from a GitHub repository, installs them, and manages them as
-systemd services.
+systemd services. The role also supports optional disk encryption functionality for
+securing additional storage devices.
 
 ## Requirements
 
@@ -16,80 +17,10 @@ systemd services.
 - Podman v4.6 or later (installed automatically by the role)
 - Git (for downloading Trustee Guest Components quadlet files from GitHub)
 - Systemd (for managing Trustee Guest Components services)
-
-### Collection requirements
-
-For instance, if the role depends on some collections and has a
-`meta/collection-requirements.yml` file for installing those dependencies, and
-in order to manage `rpm-ostree` systems, it should be mentioned here that the
- user should run
-
-```bash
-ansible-galaxy collection install -vv -r meta/collection-requirements.yml
-```
+- Parted (for disk partitioning, if disk encryption is enabled)
+- cryptsetup (for disk encryption, if disk encryption is enabled)
 
 on the *control node* before using the role.
-
-## Role Variables
-
-A description of all input variables (i.e. variables that are defined in
-`defaults/main.yml`) for the role should go here as these form an API of the
-role.  Each variable should have its own section e.g.
-
-### cvm_deploy_quadlet_repo_url
-
-The GitHub repository URL containing the Trustee Guest Components quadlet files.
-Default value is `https://github.com/litian1992/trustee-gc-quadlet-rhel`.
-
-### cvm_deploy_quadlet_repo_path
-
-The path within the repository where Trustee Guest Components quadlet files are
-located. Default value is `quadlet`.
-
-### cvm_deploy_quadlet_repo_branch
-
-The Git branch or tag to use when downloading Trustee Guest Components quadlet
-files. Default value is `main`.
-
-### cvm_deploy_quadlet_install_dir
-
-The directory where Trustee Guest Components quadlet files will be installed.
-For root users, this should be `/usr/share/containers/systemd/` or
-`/etc/containers/systemd/`. Default value is `/etc/containers/systemd`.
-
-### cvm_deploy_quadlet_reload_systemd
-
-Whether to reload systemd daemon after deploying Trustee Guest Components.
-Default value is `true`.
-
-### cvm_deploy_quadlet_enable_services
-
-Whether to enable Trustee Guest Components services to start on boot. Default
-value is `true`.
-
-### cvm_deploy_quadlet_start_services
-
-Whether to start Trustee Guest Components services immediately after deployment.
-Default value is `true`.
-
-### trustee_kbs_url
-
-The KBS (Key Broker Service) URL to use in the Trustee Guest Components
-configuration. This value will replace the `KBS_URL` placeholder in
-`/etc/trustee-gc/cdh/config.toml`. Default value is empty string (no
-replacement will occur if not set).
-
-### trustee_kbs_cert
-
-The KBS certificate to use in the Trustee Guest Components configuration. This
-value will replace the `KBS_CERT` placeholder in `/etc/trustee-gc/cdh/config.toml`.
-Default value is empty string (no replacement will occur if not set).
-
-Variables that are not intended as input, like variables defined in
-`vars/main.yml`, variables that are read from other roles and/or the global
-scope (ie. hostvars, group vars, etc.) can be also mentioned here but keep in
-mind that as these are probably not part of the role API they may change during
-the lifetime.
 
 Example of setting the variables:
 
@@ -97,29 +28,18 @@ Example of setting the variables:
 cvm_deploy_quadlet_repo_url: "https://github.com/litian1992/trustee-gc-quadlet-rhel"
 cvm_deploy_quadlet_repo_path: "quadlet"
 cvm_deploy_quadlet_repo_branch: "main"
-cvm_deploy_quadlet_install_dir: "/etc/containers/systemd"
-cvm_deploy_quadlet_reload_systemd: true
-cvm_deploy_quadlet_enable_services: true
-cvm_deploy_quadlet_start_services: true
 trustee_kbs_url: "https://kbs.example.com"
 trustee_kbs_cert: "/path/to/cert.pem"
+cvm_deploy_encrypt_disk: true
 ```
 
 ## Variables Exported by the Role
+### encrypted_disk_key
 
-This section is optional.  Some roles may export variables for playbooks to
-use later.  These are analogous to "return values" in Ansible modules.  For
-example, if a role performs some action that will require a system reboot, but
-the user wants to defer the reboot, the role might set a variable like
-`template_reboot_needed: true` that the playbook can use to reboot at a more
-convenient time.
-
-Example:
-
-### cvm_deploy_reboot_needed
-
-Default `false` - if `true`, this means a reboot is needed to apply the changes
-made by the role
+If disk encryption is enabled (`cvm_deploy_encrypt_disk: true`), this fact
+contains the base64-encoded encryption key for the encrypted disk. This key is
+required to mount the encrypted disk after a reboot. The key is automatically
+generated during disk encryption and should be securely stored for future use.
 
 ## Example Playbook
 
@@ -135,6 +55,7 @@ passed in as parameters) is always nice for users too:
     cvm_deploy_quadlet_repo_branch: "main"
     trustee_kbs_url: "https://kbs.example.com"
     trustee_kbs_cert: "/path/to/kbs-cert.pem"
+    cvm_deploy_encrypt_disk: true
   roles:
     - linux-system-roles.cvm_deploy
 ```
@@ -151,13 +72,13 @@ The role will:
    provided)
 6. Reload systemd daemon
 7. Enable and start the Trustee Guest Components services
-
-More examples can be provided in the [`examples/`](examples) directory. These
-can be useful, especially for documentation.
-
-## rpm-ostree
-
-See README-ostree.md
+8. (Optional) If `cvm_deploy_encrypt_disk` is `true`:
+   - Find an unpartitioned and unmounted disk
+   - Create a GPT partition table and partition on the disk
+   - Generate an encryption key and encrypt the partition using LUKS
+   - Format the encrypted partition with ext4
+   - Mount the encrypted disk at the specified mount point
+   - Store the encryption key in the `encrypted_disk_key` fact
 
 ## License
 

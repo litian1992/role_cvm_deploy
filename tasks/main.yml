@@ -3,92 +3,10 @@
 - name: Set platform/version specific variables
   include_tasks: tasks/set_vars.yml
 
-- name: Ensure required packages are installed
-  ansible.builtin.package:
-    name: "{{ __cvm_deploy_packages }}"
-    state: present
+- name: Deploy Trustee Guest Components using Podman Quadlets
+  include_tasks: trustee_quadlet.yml
+  when: cvm_deploy_trustee_gc | bool
 
-- name: Ensure quadlet install directory exists
-  file:
-    path: "{{ cvm_deploy_quadlet_install_dir }}"
-    state: directory
-    mode: "0755"
-
-- name: Download Trustee Guest Components quadlet files from GitHub repository
-  git:
-    repo: "{{ cvm_deploy_quadlet_repo_url }}"
-    dest: /tmp/quadlet_repo
-    version: "{{ cvm_deploy_quadlet_repo_branch }}"
-    depth: 1
-    force: true
-  register: quadlet_repo_download
-
-- name: Find Trustee Guest Components quadlet files in repository
-  find:
-    paths: "/tmp/quadlet_repo/{{ cvm_deploy_quadlet_repo_path }}"
-    patterns:
-      - "*.container"
-      - "*.volume"
-      - "*.network"
-      - "*.kube"
-    recurse: false
-  register: quadlet_files_found
-
-- name: Fail if no Trustee Guest Components quadlet files found
-  fail:
-    msg: "No quadlet files found in {{ cvm_deploy_quadlet_repo_url }}/{{ cvm_deploy_quadlet_repo_path }}"
-  when: quadlet_files_found.files | length == 0
-
-- name: Copy Trustee Guest Components quadlet files to install directory
-  copy:
-    src: "{{ item.path }}"
-    dest: "{{ cvm_deploy_quadlet_install_dir }}/{{ item.path | basename }}"
-    mode: "0644"
-    remote_src: true
-    force: true
-  loop: "{{ quadlet_files_found.files }}"
-  register: quadlet_files_copied
-
-- name: Copy Trustee Guest Components config files to /etc/trustee-gc/
-  copy:
-    src: "/tmp/quadlet_repo/configs/"
-    dest: /etc/trustee-gc/
-    mode: "0644"
-    remote_src: true
-    force: true
-
-- name: Replace KBS_URL and KBS_CERT in config.toml
-  replace:
-    path: /etc/trustee-gc/cdh/config.toml
-    regexp: "{{ item.regexp }}"
-    replace: "{{ item.replace }}"
-  loop:
-    - { regexp: 'KBS_URL', replace: '{{ trustee_kbs_url }}' }
-    - { regexp: 'KBS_CERT', replace: '{{ trustee_kbs_cert }}' }
-  when: trustee_kbs_url != "" or trustee_kbs_cert != ""
-
-- name: Reload systemd daemon
-  systemd:
-    daemon_reload: true
-  when: cvm_deploy_quadlet_reload_systemd | bool
-
-- name: Get list of installed Trustee Guest Components services from installed files
-  ansible.builtin.find:
-    paths: "{{ cvm_deploy_quadlet_install_dir }}"
-    patterns: "*.container"
-  register: quadlet_service_files
-
-- name: Enable and start Trustee Guest Components services
-  systemd:
-    name: "{{ item.path | basename | regex_replace('\\.container$', '') }}.service"
-    enabled: "{{ cvm_deploy_quadlet_enable_services | bool }}"
-    state: "started"
-    daemon_reload: true
-  loop: "{{ quadlet_service_files.files }}"
-  when: quadlet_service_files.files | length > 0
-  ignore_errors: true
-
-- name: Clean up temporary repository directory
-  file:
-    path: /tmp/quadlet_repo
-    state: absent
+- name: Create encrypted disk partition
+  include_tasks: encrypt_disk.yml
+  when: cvm_deploy_encrypt_disk | bool
