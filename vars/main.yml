@@ -9,6 +9,7 @@ __cvm_deploy_foo_config: foo.conf
 __cvm_deploy_packages:
   - podman
   - git
+  - cryptsetup
 __cvm_deploy_services: []
 # ansible_facts required by the role
 __cvm_deploy_required_facts:
