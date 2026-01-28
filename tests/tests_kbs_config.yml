@@ -1,0 +1,86 @@
+# SPDX-License-Identifier: MIT
+---
+- name: Ensure KBS URL and certificate are configured in trustee-gc config files
+  hosts: all
+  gather_facts: false
+  vars:
+    cvm_deploy_trustee_gc: true
+    cvm_deploy_encrypt_disk: false
+    cvm_deploy_trustee_kbs_url: "https://kbs.example.com:8080"
+    cvm_deploy_trustee_kbs_cert: "-----BEGIN CERTIFICATE-----\nMIIBIjANBgkq\n-----END CERTIFICATE-----"
+  roles:
+    - linux-system-roles.cvm_deploy
+  tasks:
+    - name: Stat CDH config file
+      stat:
+        path: /etc/trustee-gc/cdh/config.toml
+      register: __test_cdh_config
+
+    - name: Verify CDH config contains KBS URL
+      when: __test_cdh_config.stat.exists
+      block:
+        - name: Read CDH config file
+          slurp:
+            src: /etc/trustee-gc/cdh/config.toml
+          register: __test_cdh_content
+
+        - name: Assert CDH config contains the KBS URL
+          assert:
+            that:
+              - >-
+                cvm_deploy_trustee_kbs_url in
+                (__test_cdh_content.content | b64decode)
+            fail_msg: >-
+              KBS URL '{{ cvm_deploy_trustee_kbs_url }}' not found in
+              /etc/trustee-gc/cdh/config.toml
+
+        - name: Assert CDH config does not contain the KBS_URL placeholder
+          assert:
+            that:
+              - >-
+                'KBS_URL' not in
+                (__test_cdh_content.content | b64decode)
+            fail_msg: >-
+              Unreplaced placeholder KBS_URL still present in
+              /etc/trustee-gc/cdh/config.toml
+
+    - name: Stat AA config file
+      stat:
+        path: /etc/trustee-gc/aa/config.toml
+      register: __test_aa_config
+
+    - name: Verify AA config contains KBS URL
+      when: __test_aa_config.stat.exists
+      block:
+        - name: Read AA config file
+          slurp:
+            src: /etc/trustee-gc/aa/config.toml
+          register: __test_aa_content
+
+        - name: Assert AA config contains the KBS URL
+          assert:
+            that:
+              - >-
+                cvm_deploy_trustee_kbs_url in
+                (__test_aa_content.content | b64decode)
+            fail_msg: >-
+              KBS URL '{{ cvm_deploy_trustee_kbs_url }}' not found in
+              /etc/trustee-gc/aa/config.toml
+
+        - name: Assert AA config does not contain the KBS_URL placeholder
+          assert:
+            that:
+              - >-
+                'KBS_URL' not in
+                (__test_aa_content.content | b64decode)
+            fail_msg: >-
+              Unreplaced placeholder KBS_URL still present in
+              /etc/trustee-gc/aa/config.toml
+
+    - name: Assert at least one trustee-gc config file was found
+      assert:
+        that:
+          - __test_cdh_config.stat.exists or __test_aa_config.stat.exists
+        fail_msg: >-
+          Neither /etc/trustee-gc/cdh/config.toml nor
+          /etc/trustee-gc/aa/config.toml was found after role execution

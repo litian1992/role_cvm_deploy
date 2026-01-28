@@ -10,5 +10,5 @@
 
     - name: Install test packages
       package:
-        name: "{{ __cvm_deploy_packages }}"
+        name: "{{ (__cvm_deploy_trustee_gc_packages | default([])) + (__cvm_deploy_encrypt_disk_packages | default([])) | unique }}"
         state: present

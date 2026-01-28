@@ -3,25 +3,10 @@
 - name: Set platform/version specific variables
   include_tasks: tasks/set_vars.yml
 
-# Examples of some tasks:
-- name: Ensure required packages are installed
-  package:
-    name: "{{ __cvm_deploy_packages }}"
-    state: present
-    use: "{{ (__cvm_deploy_is_ostree | d(false)) |
-             ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
+- name: Create encrypted disk partition
+  include_tasks: encrypt_disk.yml
+  when: cvm_deploy_encrypt_disk | bool
 
-- name: Ensure required services are enabled and started
-  service:
-    name: "{{ item }}"
-    state: started
-    enabled: true
-  loop: "{{ __cvm_deploy_services }}"
-
-- name: Generate /etc/{{ __cvm_deploy_foo_config }}
-  template:
-    src: "{{ __cvm_deploy_foo_config }}.j2"
-    dest: /etc/{{ __cvm_deploy_foo_config }}
-    backup: true
-    mode: "0400"
-  notify: Handler for cvm_deploy to restart services
+- name: Deploy Trustee Guest Components using Podman Quadlets
+  include_tasks: trustee_quadlet.yml
+  when: cvm_deploy_trustee_gc | bool

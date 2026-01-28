@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
 ---
 galaxy_info:
-  author: John Doe <jdoe@corp.com>
-  description: Ansible role for managing confidential computing machine deployment
-  company: John Doe, Inc.
+  author: Li Tian <litian@redhat.com>
+  description: Ansible role for setting up confidential virtual machine deployments
+  company: Red Hat, Inc.
   license: MIT
   min_ansible_version: "2.9"
   platforms:
