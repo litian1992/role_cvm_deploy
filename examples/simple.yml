@@ -1,9 +1,14 @@
 # SPDX-License-Identifier: MIT
 ---
-- name: Example cvm_deploy role invocation
+- name: Deploy Trustee Guest Components using Podman Quadlets from GitHub repository
   hosts: all
   vars:
-    cvm_deploy_config1: example variable value
-    cvm_deploy_config2: false
+    cvm_deploy_quadlet_repo_url: "https://github.com/litian1992/trustee-gc-quadlet-rhel"
+    cvm_deploy_quadlet_repo_path: "quadlet"
+    cvm_deploy_quadlet_repo_branch: "main"
+    cvm_deploy_quadlet_install_dir: "/etc/containers/systemd"
+    cvm_deploy_quadlet_reload_systemd: true
+    cvm_deploy_quadlet_enable_services: true
+    cvm_deploy_quadlet_start_services: true
   roles:
     - linux-system-roles.cvm_deploy
