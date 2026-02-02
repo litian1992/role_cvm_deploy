@@ -4,6 +4,19 @@
     name: "{{ __cvm_deploy_packages }}"
     state: present
 
+- name: Disable SELinux
+  block:
+    - name: Set SELinux to permissive mode
+      command: setenforce 0
+      ignore_errors: true
+      failed_when: false
+
+    - name: Disable SELinux permanently
+      replace:
+        path: /etc/selinux/config
+        regexp: '^SELINUX=.*'
+        replace: 'SELINUX=disabled'
+
 - name: Ensure quadlet install directory exists
   file:
     path: "{{ cvm_deploy_quadlet_install_dir }}"
@@ -27,6 +40,7 @@
       - "*.volume"
       - "*.network"
       - "*.kube"
+      - "*.pod"
     recurse: false
   register: quadlet_files_found
 
@@ -53,34 +67,52 @@
     remote_src: true
     force: true
 
-- name: Replace KBS_URL and KBS_CERT in config.toml
+- name: Replace KBS_URL and KBS_CERT in config.toml files
   replace:
-    path: /etc/trustee-gc/cdh/config.toml
+    path: "{{ item.path }}"
     regexp: "{{ item.regexp }}"
     replace: "{{ item.replace }}"
   loop:
-    - { regexp: 'KBS_URL', replace: '{{ trustee_kbs_url }}' }
-    - { regexp: 'KBS_CERT', replace: '{{ trustee_kbs_cert }}' }
+    - { path: '/etc/trustee-gc/cdh/config.toml', regexp: 'KBS_URL', replace: '{{ trustee_kbs_url }}' }
+    - { path: '/etc/trustee-gc/cdh/config.toml', regexp: 'KBS_CERT', replace: '{{ trustee_kbs_cert }}' }
+    - { path: '/etc/trustee-gc/aa/config.toml', regexp: 'KBS_URL', replace: '{{ trustee_kbs_url }}' }
+    - { path: '/etc/trustee-gc/aa/config.toml', regexp: 'KBS_CERT', replace: '{{ trustee_kbs_cert }}' }
   when: trustee_kbs_url != "" or trustee_kbs_cert != ""
+
+- name: Create podman storage directory on encrypted disk
+  ansible.builtin.file:
+    path: "{{ cvm_deploy_encrypt_disk_mount_point }}/containers-storage"
+    state: directory
+    mode: '0755'
+  when: cvm_deploy_encrypt_disk | bool
+
+- name: Configure podman to use encrypted disk for storage
+  ansible.builtin.copy:
+    content: |
+      [storage]
+      driver = "overlay"
+      graphroot = "{{ cvm_deploy_encrypt_disk_mount_point }}/containers-storage"
+    dest: /etc/containers/storage.conf
+    mode: '0644'
+  notify: restart podman
+  when: cvm_deploy_encrypt_disk | bool
 
 - name: Reload systemd daemon
   systemd:
     daemon_reload: true
 
-- name: Get list of installed Trustee Guest Components services from installed files
+- name: Get the installed Trustee Guest Components pod name
   ansible.builtin.find:
     paths: "{{ cvm_deploy_quadlet_install_dir }}"
-    patterns: "*.container"
-  register: quadlet_service_files
+    patterns: "*.pod"
+  register: trustee_gc_pod_name
 
 - name: Enable and start Trustee Guest Components services
   systemd:
-    name: "{{ item.path | basename | regex_replace('\\.container$', '') }}.service"
+    name: "{{ trustee_gc_pod_name.files[0].path | basename | regex_replace('\\.pod$', '') }}-pod.service"
     enabled: true
-    state: started
+    state: restarted
     daemon_reload: true
-  loop: "{{ quadlet_service_files.files }}"
-  when: quadlet_service_files.files | length > 0
   ignore_errors: true
 
 - name: Clean up temporary repository directory

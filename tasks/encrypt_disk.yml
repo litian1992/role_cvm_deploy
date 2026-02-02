@@ -1,65 +1,56 @@
 # SPDX-License-Identifier: MIT
 ---
-- name: Find unpartitioned and unmounted disk
+- name: Find the firstunpartitioned disk
   shell: |
-    all_disks=$(lsblk -d -n -o NAME,TYPE | awk '$2=="disk" {print $1}')
-    mounted_devices=$(findmnt -n -o SOURCE | sed 's/[0-9]*$//' | sort -u)
-    # Find first unpartitioned and unmounted disk
-    for disk in $all_disks; do
-      disk_path="/dev/$disk"
-      if echo "$mounted_devices" | grep -q "$disk_path"; then
-        continue
-      fi
-      if ! lsblk -n -o NAME "$disk_path" | grep -qE "^${disk}[0-9]+"; then
-        has_mounted_part=false
-        for part in $(lsblk -n -o NAME "$disk_path" | grep -E "^${disk}[0-9]+"); do
-          if findmnt "/dev/$part" >/dev/null 2>&1; then
-            has_mounted_part=true
-            break
-          fi
-        done
-        if [ "$has_mounted_part" = "false" ]; then
-          echo "$disk"
-          exit 0
-        fi
-      fi
-    done
+    lsblk -n -o NAME,TYPE,PKNAME | awk '
+      $2=="disk" {disk=$1; haspart[disk]=0}
+      $2=="part" {parent=$3; if (parent in haspart) haspart[parent]=1}
+      END {
+        for (d in haspart) {
+          if (haspart[d] == 0) {
+            print d
+            exit 0
+          }
+        }
+      }
+    '
   register: unpartitioned_disk
   changed_when: false
   failed_when: false
 
-- name: Fail if no unpartitioned disk found
-  fail:
-    msg: "No unpartitioned and unmounted disk found"
-  when: unpartitioned_disk.stdout == ""
+- name: Encrypt disk
+  block:
+    - name: Set fact with disk device path
+      set_fact:
+        disk_device: "/dev/{{ unpartitioned_disk.stdout }}"
 
-- name: Set fact with disk device path
-  set_fact:
-    disk_device: "/dev/{{ unpartitioned_disk.stdout }}"
+    - name: Create partition table and partition on disk
+      shell: |
+        parted -s {{ disk_device }} mklabel gpt
+        parted -s {{ disk_device }} mkpart primary 0% 100%
 
-- name: Create partition table and partition on disk
-  shell: |
-    parted -s {{ disk_device }} mklabel gpt
-    parted -s {{ disk_device }} mkpart primary 0% 100%
+    - name: Generate a key and encrypt the partition
+      shell: |
+        head -c 32 /dev/urandom | base64 > /tmp/key
+        cryptsetup luksFormat --key-file /tmp/key --batch-mode {{ disk_device }}1
+        cryptsetup open --key-file /tmp/key {{ disk_device }}1 encrypted-disk
+        mkfs.ext4 /dev/mapper/encrypted-disk
+        [ -d {{ cvm_deploy_encrypt_disk_mount_point }} ] || mkdir -p {{ cvm_deploy_encrypt_disk_mount_point }}
+        mount /dev/mapper/encrypted-disk {{ cvm_deploy_encrypt_disk_mount_point }}
 
-- name: Generate a key and encrypt the partition
-  shell: |
-    head -c 32 /dev/urandom | base64 > /tmp/key
-    cryptsetup luksFormat --key-file /tmp/key --batch-mode {{ disk_device }}1
-    cryptsetup open --key-file /tmp/key {{ disk_device }}1 encrypted-disk
-    mkfs.ext4 /dev/mapper/encrypted-disk
-    mount /dev/mapper/encrypted-disk {{ cvm_deploy_encrypt_disk_mount_point }}
+    - name: Read key from remote host
+      slurp:
+        src: /tmp/key
+      register: slurped_key
 
-- name: Read key from remote host
-  slurp:
-    src: /tmp/key
-  register: slurped_key
+    - name: Set encrypted disk key fact
+      set_fact:
+        encrypted_disk_key: "{{ slurped_key.content}}"
 
-- name: Set encrypted disk key fact
-  set_fact:
-    encrypted_disk_key: "{{ slurped_key.content}}"
+    - name: Clean up temporary key file
+      file:
+        path: /tmp/key
+        state: absent
+  when: unpartitioned_disk.stdout != ""
 
-- name: Clean up temporary repository directory
-  file:
-    path: /tmp/key
-    state: absent
+# TODO: Add a systemd service to mount the encrypted disk at boot

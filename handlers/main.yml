@@ -5,3 +5,9 @@
     name: "{{ item }}"
     state: restarted
   loop: "{{ __cvm_deploy_services }}"
+
+- name: restart podman
+  ansible.builtin.systemd:
+    name: podman.service
+    state: restarted
+  ignore_errors: true

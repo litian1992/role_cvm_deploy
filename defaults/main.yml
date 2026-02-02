@@ -16,4 +16,4 @@ trustee_kbs_cert: ""
 
 # Encrypt disk configuration
 cvm_deploy_encrypt_disk: false
-cvm_deploy_encrypt_disk_mount_point: "/encrypted-disk"
+cvm_deploy_encrypt_disk_mount_point: "/mnt/encrypted-disk"
