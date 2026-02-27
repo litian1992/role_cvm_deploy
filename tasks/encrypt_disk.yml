@@ -29,9 +29,11 @@
         use: "{{ (__cvm_deploy_is_ostree | d(false)) |
               ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
 
-    - name: Set fact with disk device path
+    - name: Set fact with disk device path and partition path
       ansible.builtin.set_fact:
         disk_device: "/dev/{{ unpartitioned_disk.stdout }}"
+        disk_partition: >-
+          /dev/{{ unpartitioned_disk.stdout }}{{ 'p' if 'nvme' in unpartitioned_disk.stdout else '' }}1
 
     - name: Create partition table and partition on disk
       ansible.builtin.shell: |
@@ -48,8 +50,8 @@
       ansible.builtin.shell: |
         set -o pipefail
         head -c 32 /dev/urandom | base64 > {{ __cvm_deploy_tmp_key.path }}
-        cryptsetup luksFormat --key-file {{ __cvm_deploy_tmp_key.path }} --batch-mode {{ disk_device }}1
-        cryptsetup open --key-file {{ __cvm_deploy_tmp_key.path }} {{ disk_device }}1 encrypted-disk
+        cryptsetup luksFormat --key-file {{ __cvm_deploy_tmp_key.path }} --batch-mode {{ disk_partition }}
+        cryptsetup open --key-file {{ __cvm_deploy_tmp_key.path }} {{ disk_partition }} encrypted-disk
         mkfs.ext4 /dev/mapper/encrypted-disk
         [ -d {{ cvm_deploy_encrypt_disk_mount_point }} ] || mkdir -p {{ cvm_deploy_encrypt_disk_mount_point }}
         mount /dev/mapper/encrypted-disk {{ cvm_deploy_encrypt_disk_mount_point }}
