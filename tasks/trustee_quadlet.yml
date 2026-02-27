@@ -118,6 +118,18 @@
     - __repo_configs_dir.stat.exists
     - cvm_deploy_trustee_kbs_url != "" or cvm_deploy_trustee_kbs_cert != ""
 
+- name: Stat /dev/sev-guest device
+  ansible.builtin.stat:
+    path: /dev/sev-guest
+  register: __sev_guest_device
+
+- name: Add /dev/sev-guest to trustee-gc-aa.container when device exists
+  ansible.builtin.replace:
+    path: "{{ cvm_deploy_quadlet_install_dir }}/trustee-gc-aa.container"
+    regexp: '^#AddDevice=/dev/sev-guest'
+    replace: 'AddDevice=/dev/sev-guest'
+  when: __sev_guest_device.stat.exists
+
 - name: Create podman storage directory on encrypted disk
   ansible.builtin.file:
     path: "{{ cvm_deploy_encrypt_disk_mount_point }}/containers-storage"
