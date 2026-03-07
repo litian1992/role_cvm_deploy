@@ -1,10 +1,10 @@
-# Role Name
+# trustee_server
 
-[![ansible-lint.yml](https://github.com/linux-system-roles/template/actions/workflows/ansible-lint.yml/badge.svg)](https://github.com/linux-system-roles/template/actions/workflows/ansible-lint.yml) [![ansible-test.yml](https://github.com/linux-system-roles/template/actions/workflows/ansible-test.yml/badge.svg)](https://github.com/linux-system-roles/template/actions/workflows/ansible-test.yml) [![codespell.yml](https://github.com/linux-system-roles/template/actions/workflows/codespell.yml/badge.svg)](https://github.com/linux-system-roles/template/actions/workflows/codespell.yml) [![markdownlint.yml](https://github.com/linux-system-roles/template/actions/workflows/markdownlint.yml/badge.svg)](https://github.com/linux-system-roles/template/actions/workflows/markdownlint.yml) [![qemu-kvm-integration-tests.yml](https://github.com/linux-system-roles/template/actions/workflows/qemu-kvm-integration-tests.yml/badge.svg)](https://github.com/linux-system-roles/template/actions/workflows/qemu-kvm-integration-tests.yml) [![shellcheck.yml](https://github.com/linux-system-roles/template/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/linux-system-roles/template/actions/workflows/shellcheck.yml) [![tft.yml](https://github.com/linux-system-roles/template/actions/workflows/tft.yml/badge.svg)](https://github.com/linux-system-roles/template/actions/workflows/tft.yml) [![tft_citest_bad.yml](https://github.com/linux-system-roles/template/actions/workflows/tft_citest_bad.yml/badge.svg)](https://github.com/linux-system-roles/template/actions/workflows/tft_citest_bad.yml) [![woke.yml](https://github.com/linux-system-roles/template/actions/workflows/woke.yml/badge.svg)](https://github.com/linux-system-roles/template/actions/workflows/woke.yml)
+[![ansible-lint.yml](https://github.com/linux-system-roles/trustee_server/actions/workflows/ansible-lint.yml/badge.svg)](https://github.com/linux-system-roles/trustee_server/actions/workflows/ansible-lint.yml) [![ansible-test.yml](https://github.com/linux-system-roles/trustee_server/actions/workflows/ansible-test.yml/badge.svg)](https://github.com/linux-system-roles/trustee_server/actions/workflows/ansible-test.yml) [![codespell.yml](https://github.com/linux-system-roles/trustee_server/actions/workflows/codespell.yml/badge.svg)](https://github.com/linux-system-roles/trustee_server/actions/workflows/codespell.yml) [![markdownlint.yml](https://github.com/linux-system-roles/trustee_server/actions/workflows/markdownlint.yml/badge.svg)](https://github.com/linux-system-roles/trustee_server/actions/workflows/markdownlint.yml) [![qemu-kvm-integration-tests.yml](https://github.com/linux-system-roles/trustee_server/actions/workflows/qemu-kvm-integration-tests.yml/badge.svg)](https://github.com/linux-system-roles/trustee_server/actions/workflows/qemu-kvm-integration-tests.yml) [![shellcheck.yml](https://github.com/linux-system-roles/trustee_server/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/linux-system-roles/trustee_server/actions/workflows/shellcheck.yml) [![tft.yml](https://github.com/linux-system-roles/trustee_server/actions/workflows/tft.yml/badge.svg)](https://github.com/linux-system-roles/trustee_server/actions/workflows/tft.yml) [![tft_citest_bad.yml](https://github.com/linux-system-roles/trustee_server/actions/workflows/tft_citest_bad.yml/badge.svg)](https://github.com/linux-system-roles/trustee_server/actions/workflows/tft_citest_bad.yml) [![woke.yml](https://github.com/linux-system-roles/trustee_server/actions/workflows/woke.yml/badge.svg)](https://github.com/linux-system-roles/trustee_server/actions/workflows/woke.yml)
 
-![template](https://github.com/linux-system-roles/template/workflows/tox/badge.svg)
+![trustee_server](https://github.com/linux-system-roles/trustee_server/workflows/tox/badge.svg)
 
-A template for an ansible role that configures some GNU/Linux subsystem or
+A trustee_server for an ansible role that configures some GNU/Linux subsystem or
 service. A brief description of the role goes here.
 
 ## Requirements
@@ -34,12 +34,12 @@ A description of all input variables (i.e. variables that are defined in
 `defaults/main.yml`) for the role should go here as these form an API of the
 role.  Each variable should have its own section e.g.
 
-### template_foo
+### trustee_server_foo
 
 This variable is required.  It is a string that lists the foo of the role.
 There is no default value.
 
-### template_bar
+### trustee_server_bar
 
 This variable is optional.  It is a boolean that tells the role to disable bar.
 The default value is `true`.
@@ -53,8 +53,8 @@ the lifetime.
 Example of setting the variables:
 
 ```yaml
-template_foo: "oof"
-template_bar: false
+trustee_server_foo: "oof"
+trustee_server_bar: false
 ```
 
 ## Variables Exported by the Role
@@ -63,12 +63,12 @@ This section is optional.  Some roles may export variables for playbooks to
 use later.  These are analogous to "return values" in Ansible modules.  For
 example, if a role performs some action that will require a system reboot, but
 the user wants to defer the reboot, the role might set a variable like
-`template_reboot_needed: true` that the playbook can use to reboot at a more
+`trustee_server_reboot_needed: true` that the playbook can use to reboot at a more
 convenient time.
 
 Example:
 
-### template_reboot_needed
+### trustee_server_reboot_needed
 
 Default `false` - if `true`, this means a reboot is needed to apply the changes
 made by the role
@@ -79,13 +79,13 @@ Including an example of how to use your role (for instance, with variables
 passed in as parameters) is always nice for users too:
 
 ```yaml
-- name: Manage the template subsystem
+- name: Manage the trustee_server subsystem
   hosts: all
   vars:
-    template_foo: "foo foo!"
-    template_bar: false
+    trustee_server_foo: "foo foo!"
+    trustee_server_bar: false
   roles:
-    - linux-system-roles.template
+    - linux-system-roles.trustee_server
 ```
 
 More examples can be provided in the [`examples/`](examples) directory. These

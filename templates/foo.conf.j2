@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
 #
-# Example of a template of configuration file
+# Example of a trustee_server of configuration file
 #
 {{ ansible_managed | comment }}
-{{ "system_role:template" | comment(prefix="", postfix="") }}
+{{ "system_role:trustee_server" | comment(prefix="", postfix="") }}
 [foo]
-foo = {{ template_foo }}
-bar = {{ template_bar }}
+foo = {{ trustee_server_foo }}
+bar = {{ trustee_server_bar }}

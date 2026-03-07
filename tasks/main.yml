@@ -4,24 +4,11 @@
   include_tasks: tasks/set_vars.yml
 
 # Examples of some tasks:
-- name: Ensure required packages are installed
-  package:
-    name: "{{ __template_packages }}"
-    state: present
-    use: "{{ (__template_is_ostree | d(false)) |
-             ternary('ansible.posix.rhel_rpm_ostree', omit) }}"
+- name: Deploy Trustee Server Components using Podman Quadlets
+  include_tasks: trustee_quadlet.yml
+  when: trustee_server_trustee | bool
 
-- name: Ensure required services are enabled and started
-  service:
-    name: "{{ item }}"
-    state: started
-    enabled: true
-  loop: "{{ __template_services }}"
+- name: Create Secret Registration Service
+  include_tasks: secret_registration_service.yml
+  when: trustee_server_secret_registration_service_enabled | bool
 
-- name: Generate /etc/{{ __template_foo_config }}
-  template:
-    src: "{{ __template_foo_config }}.j2"
-    dest: /etc/{{ __template_foo_config }}
-    backup: true
-    mode: "0400"
-  notify: Handler for template to restart services

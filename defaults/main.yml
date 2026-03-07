@@ -3,6 +3,12 @@
 # Here is the right place to put the role's input variables.
 # This file also serves as a documentation for such a variables.
 
-# Examples of role input variables:
-template_foo: foo
-template_bar: true
+# Trustee Server Components Quadlet repository configuration
+trustee_server_trustee: true
+trustee_server_quadlet_repo_url: "https://github.com/litian1992/trustee-quadlet-rhel.git"
+trustee_server_quadlet_repo_path: "quadlet"
+trustee_server_quadlet_repo_branch: "main"
+trustee_server_quadlet_install_dir: "/etc/containers/systemd"
+
+# Secret registration service configuration
+trustee_server_secret_registration_service_enabled: false
