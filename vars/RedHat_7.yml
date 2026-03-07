@@ -2,6 +2,4 @@
 ---
 # Put internal variables here with Red Hat Enterprise Linux 7 specific values.
 
-# Example:
-__trustee_server_packages: []
 __trustee_server_services: []

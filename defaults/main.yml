@@ -12,3 +12,13 @@ trustee_server_quadlet_install_dir: "/etc/containers/systemd"
 
 # Secret registration service configuration
 trustee_server_secret_registration_service_enabled: false
+
+# SSL certificate generation (used with -config trustee_server.conf)
+trustee_server_ssl_bits: 4096
+trustee_server_ssl_md: sha256
+trustee_server_ssl_days: 3650
+trustee_server_ssl_cn: trustee-server
+trustee_server_ssl_org: Trustee
+trustee_server_ssl_country: US
+trustee_server_ssl_cert_path: /etc/trustee/kbs/server.crt
+trustee_server_ssl_key_path: /etc/trustee/kbs/server.key
