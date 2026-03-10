@@ -4,7 +4,7 @@
 
 ![trustee_server](https://github.com/linux-system-roles/trustee_server/workflows/tox/badge.svg)
 
-An Ansible role that deploys [Trustee](https://confidentialcontainers.org/docs/attestation/) server components for confidential computing. Trustee provides attestation and secret delivery services (KBS, Attestation Service) for workloads running in Trusted Execution Environments (TEEs).
+An Ansible role that deploys [Trustee](https://confidentialcontainers.org/docs/attestation/) server components for confidential computing. Trustee provides attestation and secret delivery services (KBS, AS, RVPS) for workloads running in Trusted Execution Environments (TEEs).
 
 ## Features
 
@@ -21,12 +21,6 @@ An Ansible role that deploys [Trustee](https://confidentialcontainers.org/docs/a
 ```bash
 ansible-galaxy collection install -r meta/collection-requirements.yml
 ```
-
-### Managed node
-
-- Fedora or RHEL 9+
-- Podman
-- Python 3
 
 ## Example Playbook
 
